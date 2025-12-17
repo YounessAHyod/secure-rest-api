@@ -1,12 +1,29 @@
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+
+# Virtualenv
 .venv/
 venv/
-.env
-logs/
-*.log
-*.db
+
+# IDE
 .idea/
 .vscode/
-*.pyc
-secure_rest_api.db
+
+# Pytest
+.pytest_cache/
+
+# Environment / secrets
+.env
+.env.*
+
+# Local DB / logs
+*.db
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
