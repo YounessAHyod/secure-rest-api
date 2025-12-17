@@ -1,32 +1,23 @@
-import json
-from datetime import datetime
-from pathlib import Path
-from typing import Optional
-
 from fastapi import Request
+from datetime import datetime
+from typing import Any
 
-LOG_PATH = Path("logs/audit.jsonl")
-LOG_PATH.parent.mkdir(exist_ok=True)
 
+def write_audit_log(event: str, request: Request, **metadata: Any) -> None:
+    """
+    Simple audit logger.
+    Accepts arbitrary metadata so it never breaks auth flow.
+    In production this would forward to SIEM / file / DB.
+    """
 
-def write_audit_log(
-    *,
-    event: str,
-    actor_user_id: Optional[int],
-    target_user_id: Optional[int],
-    details: dict,
-    request: Optional[Request] = None,
-) -> None:
-    entry = {
+    log_entry = {
         "timestamp": datetime.utcnow().isoformat(),
         "event": event,
-        "actor_user_id": actor_user_id,
-        "target_user_id": target_user_id,
-        "details": details,
+        "ip": request.client.host if request.client else None,
+        "path": request.url.path,
+        "method": request.method,
+        "metadata": metadata,
     }
 
-    if request and request.client:
-        entry["ip"] = request.client.host
 
-    with LOG_PATH.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry) + "\n")
+    print(f"[AUDIT] {log_entry}")

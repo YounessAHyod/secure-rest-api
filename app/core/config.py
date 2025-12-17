@@ -1,32 +1,46 @@
+from pydantic import Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    # environment
-    ENV: str = "dev"  # dev | prod
+    ENV: str = Field(
+        default="dev",
+        validation_alias=AliasChoices("ENV", "env"),
+    )
 
-    # auth
-    SECRET_KEY: str = "CHANGE_ME_IN_PROD"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    DATABASE_URL: str = "sqlite:///./secure_rest_api.db"
+    DATABASE_URL: str = Field(
+        default="sqlite:///./secure_rest_api.db",
+        validation_alias=AliasChoices("DATABASE_URL", "database_url"),
+    )
 
-    # CORS
-    CORS_ALLOW_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
-    CORS_ALLOW_CREDENTIALS: bool = True
-    CORS_ALLOW_METHODS: str = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-    CORS_ALLOW_HEADERS: str = "Authorization,Content-Type"
+    CORS_ALLOW_ORIGINS: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        validation_alias=AliasChoices("CORS_ALLOW_ORIGINS", "cors_allow_origins"),
+    )
 
-    @field_validator("SECRET_KEY")
-    @classmethod
-    def validate_secret_key(cls, v: str, info):
-        env = (info.data.get("ENV") or "dev").lower()
-        if env == "prod" and (not v or v == "CHANGE_ME_IN_PROD"):
-            raise ValueError("SECRET_KEY must be set in production (.env)")
-        return v
+    SECRET_KEY: str = Field(
+        default="CHANGE_ME_IN_PROD",
+        validation_alias=AliasChoices("SECRET_KEY", "secret_key"),
+    )
+
+    ALGORITHM: str = Field(
+        default="HS256",
+        validation_alias=AliasChoices("ALGORITHM", "algorithm"),
+    )
+
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
+        default=30,
+        validation_alias=AliasChoices("ACCESS_TOKEN_EXPIRE_MINUTES", "access_token_expire_minutes"),
+    )
+
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
 
 
 settings = Settings()

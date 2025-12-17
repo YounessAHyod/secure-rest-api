@@ -1,32 +1,34 @@
-import time
-from collections import defaultdict, deque
+from collections import defaultdict
+from time import time
+
+from fastapi import HTTPException, status
 
 
 class SimpleRateLimiter:
-    """
-    In-memory sliding-window rate limiter.
-    Good for local/dev; not suitable for multi-instance production.
-    """
-
-    def __init__(self, max_attempts: int, window_seconds: int):
-        self.max_attempts = max_attempts
-        self.window_seconds = window_seconds
-        self.attempts = defaultdict(deque)
-
-    def is_allowed(self, key: str) -> bool:
-        now = time.time()
-        q = self.attempts[key]
-
-        # drop old timestamps
-        while q and (now - q[0]) > self.window_seconds:
-            q.popleft()
-
-        if len(q) >= self.max_attempts:
-            return False
-
-        q.append(now)
-        return True
+    def __init__(self, limit: int, window_seconds: int):
+        self.limit = limit
+        self.window = window_seconds
 
 
-# 5 attempts per 60 seconds
-login_limiter = SimpleRateLimiter(max_attempts=5, window_seconds=60)
+        self.attempts = defaultdict(list)
+
+    def check(self, key: str) -> None:
+        now = time()
+        window_start = now - self.window
+
+
+        self.attempts[key] = [
+            t for t in self.attempts[key] if t > window_start
+        ]
+
+        if len(self.attempts[key]) >= self.limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many requests",
+            )
+
+        self.attempts[key].append(now)
+
+
+# Global limiter instance (used by auth route & tests)
+login_limiter = SimpleRateLimiter(limit=5, window_seconds=60)
