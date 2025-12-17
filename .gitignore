@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+logs/
+*.log
+*.db
+.idea/
+.vscode/
+*.pyc
+secure_rest_api.db
