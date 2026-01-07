@@ -50,7 +50,7 @@ def decode_access_token(token: str) -> Dict[str, Any]:
 
 
 def require_roles(*allowed_roles: str):
-    """Dependency factory enforcing RBAC based on the 'role' claim in the JWT."""
+
     def dependency(token: str = Depends(oauth2_scheme)):
         payload = decode_access_token(token)
         role = payload.get("role")
