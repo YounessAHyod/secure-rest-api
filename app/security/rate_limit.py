@@ -5,21 +5,19 @@ from fastapi import HTTPException, status
 
 
 class SimpleRateLimiter:
+
+
     def __init__(self, limit: int, window_seconds: int):
         self.limit = limit
         self.window = window_seconds
-
-
         self.attempts = defaultdict(list)
 
     def check(self, key: str) -> None:
         now = time()
         window_start = now - self.window
 
-
-        self.attempts[key] = [
-            t for t in self.attempts[key] if t > window_start
-        ]
+        # only timestamps in the current window
+        self.attempts[key] = [t for t in self.attempts[key] if t > window_start]
 
         if len(self.attempts[key]) >= self.limit:
             raise HTTPException(
@@ -29,6 +27,5 @@ class SimpleRateLimiter:
 
         self.attempts[key].append(now)
 
-
-# Global limiter instance (used by auth route & tests)
-login_limiter = SimpleRateLimiter(limit=5, window_seconds=60)
+login_ip_limiter = SimpleRateLimiter(limit=20, window_seconds=60)
+login_target_limiter = SimpleRateLimiter(limit=10, window_seconds=60)

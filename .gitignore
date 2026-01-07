@@ -20,3 +20,5 @@ logs/
 
 # Tests cache
 .pytest_cache/
+
+!.env.example

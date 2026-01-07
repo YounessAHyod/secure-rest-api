@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -9,7 +12,7 @@ from app.core.audit import write_audit_log
 from app.db.database import get_db
 from app.models.user import User
 from app.security.auth import create_access_token, hash_password, verify_password
-from app.security.rate_limit import login_limiter
+from app.security.rate_limit import login_ip_limiter, login_target_limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -49,6 +52,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     ).first()
 
     if existing:
+
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email or username already exists",
@@ -70,24 +74,23 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     return user
 
 
-from datetime import datetime, timedelta
-
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+
     ip = request.client.host if request.client else "unknown"
 
-    identifier = payload.username_or_email or payload.username
+    identifier = (payload.username_or_email or payload.username or "").strip()
     if not identifier:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="username or email required",
         )
 
-    write_audit_log("auth.login_attempt", request, username_or_email=identifier)
+    # Throttle ALL attempts (including valid user + wrong password)
+    login_ip_limiter.check(ip)
+    login_target_limiter.check(f"{ip}:{identifier.lower()}")
 
-    user = db.query(User).filter(
-        or_(User.email == identifier, User.username == identifier)
-    ).first()
+    write_audit_log("auth.login_attempt", request, username_or_email=identifier)
 
     invalid_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -95,27 +98,25 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-
+    user = db.query(User).filter(
+        or_(User.email == identifier, User.username == identifier)
+    ).first()
 
     if not user:
-        login_limiter.check(ip)
         write_audit_log("auth.login_failed", request, reason="user_not_found")
         raise invalid_exc
 
-
     now = datetime.utcnow()
 
-
     if user.locked_until and user.locked_until > now:
+        # You can choose to return invalid_exc here to reduce account-status leakage.
         raise HTTPException(
             status_code=status.HTTP_423_LOCKED,
             detail="Account locked",
         )
 
-
     if not verify_password(payload.password, user.hashed_password):
         user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-
 
         if user.failed_login_attempts > 5:
             user.locked_until = now + timedelta(minutes=10)
@@ -131,13 +132,10 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         write_audit_log("auth.login_failed", request, reason="bad_password")
         raise invalid_exc
 
-
+    # success
     user.failed_login_attempts = 0
     user.locked_until = None
     db.commit()
-
-
-    login_limiter.check(ip)
 
     token = create_access_token({"sub": str(user.id), "role": user.role})
     write_audit_log("auth.login_success", request, user_id=user.id)

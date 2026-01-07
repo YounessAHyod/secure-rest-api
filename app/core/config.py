@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-
     ENV: str = Field(
         default="dev",
         validation_alias=AliasChoices("ENV", "env"),
@@ -31,9 +30,10 @@ class Settings(BaseSettings):
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=30,
-        validation_alias=AliasChoices("ACCESS_TOKEN_EXPIRE_MINUTES", "access_token_expire_minutes"),
+        validation_alias=AliasChoices(
+            "ACCESS_TOKEN_EXPIRE_MINUTES", "access_token_expire_minutes"
+        ),
     )
-
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -41,6 +41,14 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False,
     )
+
+    def model_post_init(self, __context) -> None:
+        # Fail fast in production if SECRET_KEY is not set properly
+        if self.ENV.lower() in {"prod", "production"} and self.SECRET_KEY in {
+            "",
+            "CHANGE_ME_IN_PROD",
+        }:
+            raise ValueError("SECRET_KEY must be set to a strong random value in production")
 
 
 settings = Settings()

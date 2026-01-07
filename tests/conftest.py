@@ -10,12 +10,11 @@ from app.main import app
 from app.models.user import Base
 from app.db.database import get_db
 from app.models import user as user_model  # ensure User model is imported/registered
-from app.security.rate_limit import login_limiter
+from app.security.rate_limit import login_ip_limiter, login_target_limiter
 
 
 @pytest.fixture(scope="session")
 def test_engine():
-
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     engine = create_engine(
@@ -43,7 +42,8 @@ def db_session(test_engine):
 @pytest.fixture()
 def client(db_session):
     # reset limiter state per test (so tests don't affect each other)
-    login_limiter.attempts.clear()
+    login_ip_limiter.attempts.clear()
+    login_target_limiter.attempts.clear()
 
     def override_get_db():
         try:
